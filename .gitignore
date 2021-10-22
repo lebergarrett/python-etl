@@ -1,3 +1,5 @@
-.vscode/*
+.vscode/
 merged_df.csv
 __pycache__
+.terraform/
+.terraform*
