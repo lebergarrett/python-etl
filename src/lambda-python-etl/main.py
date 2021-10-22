@@ -1,6 +1,8 @@
 import pandas as pd
 import transformation
+import json
 import boto3
+import awswrangler as wr
 
 def lambda_handler(event, context):
     # URL where the covid data is stored
@@ -18,8 +20,15 @@ def lambda_handler(event, context):
     # Merge tables (dataframes) based on matching dates
     merged_df = transformation.merge_dfs(nyt_df, jh_df, 'date')
 
-    # Set up loading of dataframe into dynamodb table
+    # Set up connection to dynamodb table
     dynamodbclient = boto3.resource('dynamodb')
     table = dynamodbclient.Table("python-etl-table")
-    #initial load will use boto3.batch_write_item
-    #updates will add that day, unless any previous days have failed, then it will retry them
+
+    # Check if this is first load of table
+    tabledata = json.loads(table.describe_table())
+    if tabledata["Table"]["ItemCount"] == 0:
+        wr.dyanmodb.put_df(merged_df, table)
+    # If not first load, only missing days need updated
+    else:
+        # Check date in most recent row
+        # Add row per missing date until today
