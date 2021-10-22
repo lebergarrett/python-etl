@@ -1,8 +1,9 @@
+import awswrangler as wr
+import boto3
+import datetime
+import json
 import pandas as pd
 import transformation
-import json
-import boto3
-import awswrangler as wr
 
 def lambda_handler(event, context):
     # URL where the covid data is stored
@@ -28,7 +29,36 @@ def lambda_handler(event, context):
     tabledata = json.loads(table.describe_table())
     if tabledata["Table"]["ItemCount"] == 0:
         wr.dyanmodb.put_df(merged_df, table)
+
     # If not first load, only missing days need updated
     else:
-        # Check date in most recent row
-        # Add row per missing date until today
+        date = datetime.date.today()
+        # Set to last item in dataframe
+        current_row = -1
+
+        while True:
+            # First iteration should always have to add the item
+            if current_row == -1:
+                table.put_item(
+                    # Hopefully this is converting to JSON as intended??
+                    Item = merged_df.iloc[current_row].to_json(orient="records")
+                )
+            else:
+                # This won't run until at least the second iteration
+                # Query the db for day before, if not found, put item
+                # if found, break
+                try:
+                    response = table.query(
+                        KeyConditionExpression=Key('Date').eq(date)
+                    )
+                except dynamodbclient.meta.client.exceptions.ResourceNotFoundException
+                    print("Info not found for previous date. Adding now")
+                    table.put_item(
+                        Item = merged_df.iloc[current_row].to_json(orient="records")
+                    )
+                if response:
+                    break
+                # Maybe add another break condition
+
+            date = datetime.timedelta(days=1)
+            current_row -= 1
